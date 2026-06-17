@@ -73,7 +73,7 @@ jobs:
       - name: Create package structure
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          PKG_NAME="tmux-${VERSION}-1+mos-plugin"
+          PKG_NAME="mos-tmux-${VERSION}-1+mos-plugin"
           PKG_DIR="${PKG_NAME}_amd64"
 
           mkdir -p ${PKG_DIR}/usr/bin/plugins
@@ -88,7 +88,7 @@ jobs:
           cp icon.png ${PKG_DIR}/var/www/mos-plugins/tmux/ || true
 
           cat > ${PKG_DIR}/DEBIAN/control << EOF
-          Package: tmux
+          Package: mos-tmux
           Version: ${VERSION}-1+mos-plugin
           Architecture: amd64
           Maintainer: admin@minenet.at
@@ -111,7 +111,7 @@ jobs:
       - name: Build .deb package
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          PKG_NAME="tmux-${VERSION}-1+mos-plugin"
+          PKG_NAME="mos-tmux-${VERSION}-1+mos-plugin"
           PKG_DIR="${PKG_NAME}_amd64"
           DEB_FILE="${PKG_NAME}_amd64.deb"
 
@@ -127,8 +127,8 @@ jobs:
             ## tmux Plugin ${{ steps.version.outputs.VERSION }}
 
           files: |
-            tmux-${{ steps.version.outputs.VERSION }}-1+mos-plugin_amd64.deb
-            tmux-${{ steps.version.outputs.VERSION }}-1+mos-plugin_amd64.deb.md5
+            mos-tmux-${{ steps.version.outputs.VERSION }}-1+mos-plugin_amd64.deb
+            mos-tmux-${{ steps.version.outputs.VERSION }}-1+mos-plugin_amd64.deb.md5
           draft: false
           prerelease: false
         env:
