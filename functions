@@ -1,0 +1,22 @@
+#!/bin/bash
+
+install() {
+  if [ ! -f /usr/bin/plugins/tmux ] ; then
+    ln -sf /usr/bin/tmux /usr/bin/plugins/tmux
+  fi
+}
+
+uninstall() {
+  rm -f /usr/bin/plugins/tmux
+  rm -f /etc/tmux.conf
+}
+
+mos_start_after_services() {
+  MOUSE=$(jq -r '.mouse // false' /boot/optional/plugins/tmux/settings.json 2>/dev/null)
+
+  if [ "$MOUSE" == "true" ] ; then
+    echo "set -g mouse on" > /etc/tmux.conf
+  else
+    rm -f /etc/tmux.conf
+  fi
+}

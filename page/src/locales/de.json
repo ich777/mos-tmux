@@ -1,0 +1,13 @@
+{
+  "plugin_tmux": {
+    "title": "tmux",
+    "description": "Terminal-Multiplexer mit persistenten Sitzungen",
+    "settings": "Einstellungen",
+    "mouse": "Mausunterstützung aktivieren",
+    "save_settings": "Einstellungen speichern",
+    "terminal": "tmux Terminal",
+    "terminal_hint": "Interaktive tmux Konsole",
+    "open_terminal": "Terminal öffnen",
+    "close_terminal": "Terminal schließen"
+  }
+}
