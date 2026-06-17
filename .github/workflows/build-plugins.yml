@@ -1,0 +1,135 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - '[0-9]*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '0.0.1'
+        required: true
+        default: '0.0.1'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake pkg-config bison libevent-dev libncurses-dev make gcc g++ wget jq
+
+      - name: Get latest tmux version
+        id: tmux-version
+        run: |
+          REPO_V=$(wget -qO- "https://api.github.com/repos/tmux/tmux/releases/latest" | jq -r '.tag_name')
+          echo "TMUX_VERSION=$REPO_V" >> $GITHUB_OUTPUT
+          echo "Using tmux version: $REPO_V"
+
+      - name: Clone and build tmux
+        run: |
+          git clone https://github.com/tmux/tmux.git tmux-src
+          cd tmux-src
+          git checkout ${{ steps.tmux-version.outputs.TMUX_VERSION }}
+
+          sh autogen.sh
+          ./configure --enable-static --prefix=/usr
+          make -j$(nproc)
+          make install DESTDIR=$GITHUB_WORKSPACE/tmux-src/staging
+
+      - name: Download plugin icon
+        run: |
+          wget -O icon.png "https://raw.githubusercontent.com/ich777/mos-templates/master/images/tmux.png" || true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build web plugin
+        working-directory: page
+        env:
+          PLUGIN_VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          npm install
+          npm run build
+
+      - name: Create package structure
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          PKG_NAME="tmux-${VERSION}-1+mos-plugin"
+          PKG_DIR="${PKG_NAME}_amd64"
+
+          mkdir -p ${PKG_DIR}/usr/bin/plugins
+          mkdir -p ${PKG_DIR}/var/www/mos-plugins/tmux
+          mkdir -p ${PKG_DIR}/DEBIAN
+
+          cp tmux-src/staging/usr/bin/tmux ${PKG_DIR}/usr/bin/
+          chmod +x ${PKG_DIR}/usr/bin/tmux
+          ln -s /usr/bin/tmux ${PKG_DIR}/usr/bin/plugins/tmux
+
+          cp -R page/dist/tmux/* ${PKG_DIR}/var/www/mos-plugins/tmux/
+          cp icon.png ${PKG_DIR}/var/www/mos-plugins/tmux/ || true
+
+          cat > ${PKG_DIR}/DEBIAN/control << EOF
+          Package: tmux
+          Version: ${VERSION}-1+mos-plugin
+          Architecture: amd64
+          Maintainer: admin@minenet.at
+          Description: tmux Plugin for MOS
+          EOF
+
+          cat > ${PKG_DIR}/DEBIAN/postinst << 'EOF'
+          #!/bin/bash
+          chmod +x /usr/bin/tmux
+          exit 0
+          EOF
+          chmod +x ${PKG_DIR}/DEBIAN/postinst
+
+          cat > ${PKG_DIR}/DEBIAN/postrm << 'EOF'
+          #!/bin/bash
+          exit 0
+          EOF
+          chmod +x ${PKG_DIR}/DEBIAN/postrm
+
+      - name: Build .deb package
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          PKG_NAME="tmux-${VERSION}-1+mos-plugin"
+          PKG_DIR="${PKG_NAME}_amd64"
+          DEB_FILE="${PKG_NAME}_amd64.deb"
+
+          dpkg-deb --build ${PKG_DIR}
+          md5sum ${DEB_FILE} | awk '{print $1}' > ${DEB_FILE}.md5
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: tmux ${{ steps.version.outputs.VERSION }}
+          body: |
+            ## tmux Plugin ${{ steps.version.outputs.VERSION }}
+
+          files: |
+            tmux-${{ steps.version.outputs.VERSION }}-1+mos-plugin_amd64.deb
+            tmux-${{ steps.version.outputs.VERSION }}-1+mos-plugin_amd64.deb.md5
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
